@@ -139,37 +139,29 @@ const exerciseMachine = Machine<ExerciseContext, ExerciseSchema, ExerciseEvent>(
 
 const App: React.FC = () => {
   const [current, send] = useMachine(exerciseMachine);
-
-  const render = () => {
-    const currentQuestion = current.context.questions[0];
-
-    if (current.matches('nothingselected')) {
-      return <RenderQuestion
-        currentQuestion={currentQuestion}
-        provideAnswer={(answer, askedForHint) => send(selectedEvent(currentQuestion, answer, askedForHint))}
-      />;
-    } else if (current.matches('correctAnswer')) {
-      return renderCorrectAnswer(
-        () => send(nextQuestion(currentQuestion, true, current.event.askedForHint))
-      );
-    } else if (current.matches('incorrectAnswer')) {
-      return renderIncorrectAnswer(
-        currentQuestion,
-        () => send(nextQuestion(currentQuestion, false, current.event.askedForHint))
-      );
-    } else if (current.matches('finished')) {
-      return renderFinished();
-    } else if (current.matches('initial')) {
-      return renderLoadingScreen();
-    } else if (current.matches('loadingFailed')) {
-      return renderLoadingFailed();
-    }
-  };
+  const currentQuestion = current.context.questions[0];
 
   return (
     <div className="App">
       <header className="App-header">
-        {render()}
+        {current.matches('nothingselected') &&
+          <RenderQuestion
+            currentQuestion={currentQuestion}
+            provideAnswer={(answer, askedForHint) => send(selectedEvent(currentQuestion, answer, askedForHint))}
+          />
+        }
+        {current.matches('correctAnswer') && renderCorrectAnswer(
+          () => send(nextQuestion(currentQuestion, true, current.event.askedForHint))
+        )}
+        {current.matches('incorrectAnswer') &&
+          renderIncorrectAnswer(
+            currentQuestion,
+            () => send(nextQuestion(currentQuestion, false, current.event.askedForHint))
+          )
+        }
+        {current.matches('finished') && renderFinished()}
+        {current.matches('initial') && renderLoadingScreen()}
+        {current.matches('loadingFailed') && renderLoadingFailed()}
       </header>
     </div>
   );

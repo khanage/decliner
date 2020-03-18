@@ -12,10 +12,13 @@ export const RenderQuestion: React.FC<QuestionRenderProps> = ({ currentQuestion,
     const [show, setShow] = useState(false);
 
     return <div>
-        <div>
+        <div className='prompt'>
             {currentQuestion.question.replace('{}', '_______')}
         </div>
-        <div>
+        <div className='translation'>
+            ({currentQuestion.translation})
+        </div>
+        <div className='answers'>
             {currentQuestion.answers.map((answer, index) => {
                 return <button key={index} onClick={() => provideAnswer(answer, show)}>{answer}</button>
             })}
