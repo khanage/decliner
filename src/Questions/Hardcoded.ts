@@ -1,5 +1,14 @@
 import { esse, tu, ego, is, ea, id } from '../WordReference';
-import { Question } from './Types';
+import { Question, ExerciseSet } from './Types';
+
+export const loadExercises = (): Promise<ExerciseSet[]> => {
+    return new Promise(resolve =>
+        setTimeout(() => resolve([
+            { name: 'esse', questions: shuffle([femina, feminae]) },
+            { name: 'Dative', questions: shuffle([tibi, mihi, eīFeminine, eīMasculine, eīNeuter]) },
+        ]), 800)
+    );
+};
 
 export const loadQuestions = (): Promise<Question[]> => {
     return new Promise(resolve =>
@@ -13,7 +22,7 @@ export const loadQuestions = (): Promise<Question[]> => {
                 eīMasculine,
                 eīNeuter
             ])
-        ), 2000));
+        ), 200));
 }
 
 function shuffle<A>(a: A[]): A[] {
@@ -51,7 +60,7 @@ const femina: Question = {
     answer: esse.active.indicative.s3,
     dictionaryForm: esse,
     answers: generateAnswers(esse.active.indicative.s3, 4, esse.active.indicative)
-}
+};
 
 const mihi: Question = {
     question: 'Marcus gladium {} dat',

@@ -1,8 +1,8 @@
 import React from 'react';
 import './App.css';
-import { Machine, assign } from 'xstate';
+import { Machine, assign, AssignAction } from 'xstate';
 import { useMachine } from '@xstate/react';
-import { Question, loadQuestions, RenderQuestion } from './Questions';
+import { Question, RenderQuestion, loadExercises, ExerciseSet } from './Questions';
 import { renderCorrectAnswer, renderIncorrectAnswer, renderFinished, renderLoadingScreen, renderLoadingFailed } from './Render';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
@@ -10,15 +10,20 @@ interface ExerciseSchema {
   states: {
     initial: {},
     loadingFailed: {},
-    nothingselected: {},
-    correctAnswer: {},
-    incorrectAnswer: {},
-    finished: {},
+    noExerciseSelected: {},
+    exerciseSelected: {
+      states: {
+        nothingselected: {},
+        correctAnswer: {},
+        incorrectAnswer: {},
+      }
+    },
   },
 };
 
 type ExerciseContext = {
   questions: Question[],
+  exercises: ExerciseSet[],
 };
 
 interface SelectedEvent {
@@ -57,9 +62,24 @@ function isNextQuestionEvent(event: ExerciseEvent): event is NextQuestionEvent {
   return event.type === 'NEXT_QUESTION';
 };
 
+interface ExerciseSelectedEvent {
+  type: 'EXERCISE_SELECTED',
+  currentExercise: ExerciseSet,
+}
+
+const exerciseSelected = (exercise: ExerciseSet): ExerciseSelectedEvent => ({
+  type: 'EXERCISE_SELECTED',
+  currentExercise: exercise,
+});
+
+function isExerciseSelectedEvent(event: ExerciseEvent): event is ExerciseSelectedEvent {
+  return event.type === 'EXERCISE_SELECTED';
+}
+
 type ExerciseEvent =
   | SelectedEvent
   | NextQuestionEvent
+  | ExerciseSelectedEvent
   ;
 
 const isCorrectAnswer = (_: ExerciseContext, { answer, question }: SelectedEvent) =>
@@ -68,31 +88,43 @@ const isCorrectAnswer = (_: ExerciseContext, { answer, question }: SelectedEvent
 const hasMoreQuestions = (context: ExerciseContext) =>
   context.questions.length > 1;
 
-const transitionToNextQuestion = (context: ExerciseContext, event: ExerciseEvent): void => {
+const transitionToNextQuestion = assign((context: ExerciseContext, event: ExerciseEvent) => {
   if (isNextQuestionEvent(event)) {
-    console.trace(context.questions);
-    context.questions.shift();
-    if (event.correct) {
-      assign({ questions: context.questions });
-    } else {
-      assign({ questions: context.questions.push(event.currentQuestion) });
+    let updatedQuestions = Object
+      .assign([], context.questions);
+
+    updatedQuestions.shift();
+
+    if (!event.correct) {
+      updatedQuestions.push(event.currentQuestion);
     }
+
+    return { questions: updatedQuestions };
+  } else {
+    console.error('Bad messsage: {event}, expecting a next question event')
+    return {};
   }
-};
+});
+
+const selectExercise: AssignAction<ExerciseContext, ExerciseEvent> = assign((_: ExerciseContext, event: ExerciseEvent) =>
+  isExerciseSelectedEvent(event)
+    ? { questions: event.currentExercise.questions }
+    : {}
+);
 
 const exerciseMachine = Machine<ExerciseContext, ExerciseSchema, ExerciseEvent>({
   id: 'exercise',
   initial: 'initial',
-  context: { questions: [] },
+  context: { questions: [], exercises: [], },
 
   states: {
     initial: {
       invoke: {
-        id: 'loadQuestions',
-        src: (context, event) => loadQuestions(),
+        id: 'loadExercises',
+        src: (context, event) => loadExercises(),
         onDone: {
-          target: 'nothingselected',
-          actions: assign({ questions: (_, event) => event.data })
+          target: '#noExerciseSelected',
+          actions: assign({ exercises: (_, event) => event.data })
         },
         onError: {
           target: 'loadingFailed',
@@ -101,63 +133,107 @@ const exerciseMachine = Machine<ExerciseContext, ExerciseSchema, ExerciseEvent>(
     },
     loadingFailed: {},
 
-    nothingselected: {
+    noExerciseSelected: {
+      id: 'noExerciseSelected',
+      onExit: selectExercise,
       on: {
-        SELECTED: [
-          {
-            target: 'correctAnswer',
-            cond: isCorrectAnswer,
-          },
-          { target: 'incorrectAnswer' },
-        ]
+        EXERCISE_SELECTED: 'exerciseSelected',
       }
     },
 
-    correctAnswer: {
-      onExit: transitionToNextQuestion,
-      on: {
-        NEXT_QUESTION: [
-          {
-            target: 'nothingselected',
-            cond: hasMoreQuestions,
-          },
-          { target: 'finished' },
-        ]
+    exerciseSelected: {
+      initial: 'nothingselected',
+      states: {
+        nothingselected: {
+          on: {
+            SELECTED: [
+              {
+                target: 'correctAnswer',
+                cond: isCorrectAnswer,
+              },
+              { target: 'incorrectAnswer' },
+            ]
+          }
+        },
+
+        correctAnswer: {
+          onExit: transitionToNextQuestion,
+          on: {
+            NEXT_QUESTION: [
+              {
+                target: 'nothingselected',
+                cond: hasMoreQuestions,
+              },
+              { target: '#noExerciseSelected' },
+            ]
+          }
+        },
+
+        incorrectAnswer: {
+          onExit: transitionToNextQuestion,
+          on: {
+            NEXT_QUESTION: 'nothingselected',
+          }
+        },
       }
     },
-
-    incorrectAnswer: {
-      onExit: transitionToNextQuestion,
-      on: {
-        NEXT_QUESTION: 'nothingselected',
-      }
-    },
-
-    finished: {}
   },
 });
+
+interface ExercisesProps {
+  exercises: ExerciseSet[],
+  selectExercise: (exercise: ExerciseSet) => void,
+};
+
+const RenderExercises: React.FC<ExercisesProps> = ({ exercises, selectExercise }) => {
+  return <div>
+
+    <div>Select an exercise</div>
+
+    <ul>
+      {exercises.map((exercise, index) => {
+        return <li key={index}>
+          <button
+            onClick={() => selectExercise(exercise)}>
+            {exercise.name}
+          </button>
+        </li>
+      })}
+    </ul>
+  </div>;
+};
 
 const App: React.FC = () => {
   const [current, send] = useMachine(exerciseMachine);
   const currentQuestion = current.context.questions[0];
+  const currentEvent = current.event;
 
   return (
     <div className="App">
       <header className="App-header">
-        {current.matches('nothingselected') &&
+        {current.matches('exerciseSelected.nothingselected') &&
           <RenderQuestion
             currentQuestion={currentQuestion}
             provideAnswer={(answer, askedForHint) => send(selectedEvent(currentQuestion, answer, askedForHint))}
           />
         }
-        {current.matches('correctAnswer') && renderCorrectAnswer(
-          () => send(nextQuestion(currentQuestion, true, current.event.askedForHint))
-        )}
-        {current.matches('incorrectAnswer') &&
-          renderIncorrectAnswer(
+        {current.matches('exerciseSelected.correctAnswer')
+          && isSelectedEvent(currentEvent)
+          && renderCorrectAnswer(
+            () => send(nextQuestion(currentQuestion, true, currentEvent.askedForHint))
+          )}
+        {current.matches('exerciseSelected.incorrectAnswer')
+          && isSelectedEvent(currentEvent)
+          && renderIncorrectAnswer(
             currentQuestion,
-            () => send(nextQuestion(currentQuestion, false, current.event.askedForHint))
+            () => send(nextQuestion(currentQuestion, false, currentEvent.askedForHint))
           )
+        }
+        {current.matches('noExerciseSelected') &&
+          <RenderExercises
+            exercises={current.context.exercises}
+            selectExercise={exercise => send(exerciseSelected(exercise))}
+          />
         }
         {current.matches('finished') && renderFinished()}
         {current.matches('initial') && renderLoadingScreen()}
