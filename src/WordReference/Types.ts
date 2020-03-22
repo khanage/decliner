@@ -27,18 +27,24 @@ export type Genitive =
 
 export interface Noun extends DictionaryForm {
     partOfSpeech: 'noun',
-    firstPersonForm: string,
-    singularGenitive: Genitive,
-    stem: string,
+    english: string,
+    gender: 'masc' | 'fem' | 'neut',
+    declension: 1 | 2 | 3 | 4,
+    singular: {
+        nom: string,
+        acc: string,
+        gen: string,
+        dat: string,
+        abl: string
+    },
+    plural: {
+        nom: string,
+        acc: string,
+        gen: string,
+        dat: string,
+        abl: string
+    }
 };
-
-export const noun = (firstPersonForm: string, stem: string, singularGenitive: Genitive): Noun => ({
-    partOfSpeech: 'noun',
-    dictionaryForm: firstPersonForm + ', ' + singularGenitive,
-    firstPersonForm,
-    singularGenitive,
-    stem
-})
 
 export interface Adjective extends DictionaryForm {
     partOfSpeech: 'adjective',
@@ -47,6 +53,7 @@ export interface Adjective extends DictionaryForm {
 export interface Verb extends DictionaryForm {
     partOfSpeech: 'verb',
     inifinitive: string,
+    conjugation: 1 | 2 | 3 | 4 | 'mixed' | 'irregular',
     active: {
         indicative: {
             s1: string,
