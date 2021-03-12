@@ -23,7 +23,7 @@
     "xstate": "^4.7.2"
   },
   "devDependencies": {
-    "react-dev-utils": "^10.1.0"
+    "react-dev-utils": "^11.0.4"
   },
   "scripts": {
     "start": "react-scripts start",
